@@ -88,7 +88,7 @@ g++ test.o -o test.exe
 
 #### 3.1 gdb调试执行
 
-在编译程序时，使用 `gcc` 或者 `g++` 时一定要加上 `-g` 选项，如
+**在编译程序时，使用 `gcc` 或者 `g++` 时一定要加上 `-g` 选项**，如
 
 ```shell
 gcc -g -o hello hello.c
@@ -120,12 +120,109 @@ ulimit -c unlimited
 
 #### 3.2 置断点
 
-#### 3. gdb命令大全
+~~~shell
+#在代码的某一行设置断点
+(gdb) break 文件名:行号
+#为函数设置断点
+(gdb) break 函数名
+#使用正则表达式设置函数断点
+(gdb) rb 正则表达式
+# 通过偏移量设置断点
+(gdb) b +偏移量  
+(gdb) b -偏移量
+#设置条件断点
+(gdb) b 断点 条件
+(gdb) b demo.cpp:8 if i==900
+#在指令地址上设置断点
+(gdb) b *指令地址
+(gdb) p fun_test
+(gdb) b *0x400a0b
+# 设置临时断点 
+(gdb) tb 断点
+#启用禁用断点
+(gdb) disable   断点编号（可以是范围）
+(gdb) enable   断点编号
+#启用禁用一次断点
+(gdb) enable once 断点编号
+#启用断点并删除
+(gdb) enable delete 断点编号
+#启用断点并命中N次
+(gdb) enable count 数量 断点编号
+#忽略断点前N次命中
+(gdb) ignore 断点编号 次数
+#删除断点
+(gdb) delete 断点编号
+(gdb) clear 函数名
+(gdb) clear 行号
+#继续运行并跳过当前断点 N 次
+(gdb) continue 次数
+#继续运行直到当前函数执行完成
+(gdb) finish
+~~~
+
+#### 3.3 查看当前参数
+
+~~~shell
+#查看变量
+(gdb) p/print c 
+(gdb) print 变量名=值
+#断点
+(gdb) info b #断点信息
+#参数
+(gdb) info/i args
+#gdb内嵌函数，比如一些c函数sizeof、strcmp
+(gdb) p sizeof(int)
+#查看结构体/类的值
+(gdb) p *new_node
+#print格式
+(gdb) set print null-stop
+(gdb) set print pretty
+(gdb) set print array on
+#自动显示变量的值，如果 display 命令后面跟多个变量名，则必须要求这些变量的类型相同（比如都是整型变量）。如果长度不相同，则需要分开使用。
+(gdb) display 变量名
+(gdb) info display
+undisplay 编号
+~~~
+
+#### 3.4 监控内存
+
+watch命令的使用方式是
+
+```shell
+(gdb) watch 变量名或内存地址
+#当设置的观察点是一个局部变量时，局部变量无效后，观察点也会失效。在观察点失效时 `GDB` 可能会提示如下信息：
+Watchpoint 2 deleted because the program has left the block in which its expression is valid.
+```
+
+查看内存使用 `x` 命令查看各个变量的内存信息
+
+~~~
+(gdb) x /选项 地址
+~~~
+
+#### 3.5 栈回溯
+
+查看栈回溯信息的命令是 `backtrace`，通过 `frame 栈帧号` 的方式来切换栈帧
+
+~~~shell
+#执行命令来查看指定数量的栈帧
+(gdb) bt 栈帧数量
+#切换栈帧
+(gdb) frame 2 
+(gdb) f 2
+(gdb) f 帧地址
+(gdb) up/down 
+#查看当前帧的所有局部变量的值
+(gdb) info locals
+~~~
+
+#### 3.6 gdb命令大全
 
 ~~~shell
 (gdb) list #查看代码
 (gdb) list 行号
 (gdb) list 函数名
+(gdb) s #单步执行
 (gdb) next # 执行下一行语句
 (gdb) c # continue从当前位置连续执行
 (gdb) detach #让程序与 GDB 调试器分离
@@ -133,6 +230,7 @@ ulimit -c unlimited
 (gdb) q #停止运行
 (gdb) set args a b c d #添加参数，如果单个命令行参数之间含有空格，可以使用引号将参数包裹起来。
 (gdb) show args #查看命令行参数是否设置成功
+
 ~~~
 
 ### 4 静态库和动态库
