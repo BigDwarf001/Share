@@ -141,6 +141,7 @@ public:
     void sleep(){ cout << "animal sleep" << endl; }
     void breathe(){ cout << "animal breathe haha" << endl; }
 };
+
 class fish :public animal{
 public:
     void breathe(){ cout << "fish bubble" << endl; }

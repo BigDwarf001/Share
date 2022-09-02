@@ -10,6 +10,7 @@ Shell命令
   -  whereis 命令用于搜索给定命令的二进制、源码和手册页文件
 - 字符串分割|文件分割|剪切|截取
   - echo $name | awk '{split($0, arr, " "); print arr[2]}'
+  - echo $name | awk 'print $1'
 - 文件相关
   - touch 创建文件
   - mk
