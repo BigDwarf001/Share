@@ -532,17 +532,127 @@ int open(const char *pathname, int flags, mode_t mode); // 创建文件，不能
 
 #### 5.5 Linux系统IO函数
 
+ error是一个全局变量,定义在头文件error.h中。它总是会记录系统最后一次出现错误的值(这个值是一个int类型)。每一个int类型都定义一个字符串描述的字符串。
+
+**void perror(const char*s)**，头文件：stdio.h。根据error对应的字符串加上直接的描述输出到标准错误
+
+~~~cpp
+int fd = open("a.txt",O_RDONLY);
+perror("file");
+// file: No such file or directory
+
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+int open(const char *pathname, int flags);
+int open(const char* pathname,int flags,mode_t mask);
+//pathname:要创建的文件路径
+//flags:对文件的操作权限, 必选项-->O_RDONLY  O_RDWR  O_WRONLY这三个互斥 可选项-->O_CREATE
+//mode:表示创建出来的新的文件的操作权限(通常用八进制数表示，777)
+//返回值：-1表示错误
+
+#include <unistd.h>
+size_t read(int fd,void *buf,size_t count);
+size_t write(int fd,void *buf,size_t count);
+//buf暂存数据的buf(主调函数分配内存，通常为char *)， count buf的大小(通常传sizeof(buf))
+//返回值:-1 ==>读文件失败，0 ==>数据读完了(通常我们通过0来判断对方是否已经传递完数据)，>0 ==>读取的字节数
+
+#include <unistd.h>
+#include <fcntl.h>
+int fcntl(int fd,int cmd,.../*arg*/);
+//cmd 表示对文件描述符进行如何操作，arg 可变参数
+//cmd参数
+//F_DUPFD  -->  复制的文件一个文件描述符，得到一个新的文件描述符(复制的意思是指从文件描述符表中找一个空闲的最小的指向同一个文件,而不是将fd的值复制一份)
+//F_GETFL   -->  获取指定文件描述符文件状态flag
+//F_SETFL   -->   设置文件描述符状态flag
+~~~
+
 #### 5.6 文件属性操作函数
+
+~~~cpp
+//修改程序中的 mask掩码
+#include <sys/types.h>
+#include <sys/stat.h>
+mode_t  umask(mode_t mask);
+
+//判断某个文件是否具有某个权限，判断文件是否存在
+int access(const char *pathname,int mode);
+// mode: R_OK  W_OK  X_OK  F_OK
+
+//减缩或者扩展文件尺寸
+int truncate(const char*path,off_t length);
+
+//移动文件读写指针
+off_t lseek(int fd,off_t offset,int whence);                
+//offset:需要偏移的大小
+//whence:从什么地方开始偏移
+//返回值:文件读写指针的位置
+//SEEK_SET 头
+//SEEK_END 尾
+//SEEK_CUR 当前位置
+~~~
 
 #### 5.7 目录操作函数
 
+~~~cpp
+#include <sys/types.h>
+#include <sys/stat.h>
+int mkdir(const char *pathname,mode_t mode);
+
+#include <unistd.h>
+int rmdir(const char *pathname);
+
+#include <stdio.h>
+int rename(const char *oldpath, const char *newpath);
+
+#include <unistd.h>
+int chdir(const char *path); //修改进程的工作目录
+
+#include <unistd.h>
+char *getcwd(char *buf, size_t size);
+~~~
+
 #### 5.8 目录遍历函数
+
+~~~cpp
+#include <sys/types.h>
+#include <dirent.h>
+DIR *opendir(const char *name);
+//DIR * 类型：理解为目录流信息 错误返回NULL
+
+#include <dirent.h>
+struct dirent *readdir(DIR *dirp);
+//struct dirent，代表读取到的文件的信息 读取到了末尾或者失败了，返回NULL
+
+#include <sys/types.h>
+#include <dirent.h>
+int closedir(DIR *dirp);
+~~~
 
 #### 5.9 direct结构体和d_type
 
+~~~cpp
+struct dirent {
+    ino_t          d_ino;       // 此目录进入点的inode
+    off_t          d_off;       // 目录文件开头至此目录进入点的位移
+    unsigned short d_reclen;    // d_name的实际长度
+    unsigned char  d_type;      // d_name所指的文件类型 
+    char           d_name[256]; // 文件名
+};
+~~~
+
+<img src="image\20220913001.png" style="zoom:50%;" />
+
 #### 5.10 dup、dup2函数
 
-#### 5.11 fcntl函数
+~~~cpp
+//复制一个文件描述符，返回值返回新的文件描述符
+int dup(int oldfd);
+//重定义一个文件描述符
+int dup2(int oldfd,int newfd);
+//oldfd 指向 a.txt    newfd指向 b.txt
+//调用完之后，oldfd和newfd都指向 a.txt
+~~~
 
 ## 进程
 
@@ -568,33 +678,297 @@ int open(const char *pathname, int flags, mode_t mode); // 创建文件，不能
 
 ### 4 进程相关函数
 
-getpid
+每个进程都由进程号来标识，其类型为 pid_t（整型），进程号的范围：0～32767。进程号总是唯一的，但可以重用。当一个进程终止后，其进程号就可以再次使用。
+
+任何进程（除 init 进程）都是由另一个进程创建，该进程称为被创建进程的父进程，对应的进程号称为父进程号（PPID）。
+
+进程组是一个或多个进程的集合。他们之间相互关联，进程组可以接收同一终端的各种信号，关联的进程有一个进程组号（PGID）。默认情况下，当前的进程号会当做当前的进程组号。
+
+~~~cpp
+ pid_t getpid(void);
+ pid_t getppid(void);
+ pid_t getpgid(pid_t pid);
+~~~
 
 ### 5 进程创建
 
+Linux 的 `fork()` 使用是通过`写时拷贝` (copy- on-write) 实现。内核此时并不复制整个进程的地址空间，而是让父子进程共享同一个地址空间。只用在需要写入的时候才会复制地址空间，从而使各个进行拥有各自的地址空间。
+
+~~~cpp
+#include <sys/types.h>
+#include <unistd.h>
+
+pid_t fork(void);
+//用于创建子进程。
+//fork()的返回值会返回两次。一次是在父进程中，一次是在子进程中。
+//在父进程中返回创建的子进程的ID，在子进程中返回0，在父进程中返回-1，表示创建子进程失败，并且设置errno
+~~~
+
+父子进程共同点：某些状态下，子进程刚被创建出来，还没有执行任何的写数据的操作
+   - 用户区的数据
+   - 文件描述符表
+
+父子进程对变量是不是共享的？
+
+- 刚开始的时候，是一样的，共享的。如果修改了数据，不共享了。
+- 读时共享（子进程被创建，两个进程没有做任何的写的操作），写时拷贝。
+
 ### 6 exec函数族
+
+exec函数族的作用是根据指定的文件名找到可执行文件，并用它来取代调用进程的内容，也就是在调用进程内部执行一个可执行文件。
+
+~~~cpp
+int execl(const char *path, const char *arg, .../* (char *) NULL */);
+int execlp(const char *file, const char *arg, ... /* (char *) NULL */);
+int execle(const char *path, const char *arg, .../*, (char *) NULL, char *const envp[] */);
+int execv(const char *path, char *const argv[]);
+int execvp(const char *file, char *const argv[]);
+int execvpe(const char *file, char *const argv[], char *const envp[]);
+int execve(const char *filename, char *const argv[], char *const envp[]);
+
+//path:需要指定的执行的文件的路径或者名称，推荐使用绝对路径
+//arg:是执行可执行文件所需要的参数列表，第一个参数一般没有什么作用，为了方便，一般写的是执行的程序的名称，从第二个参数开始往后，就是程序执行所需要的的参数列表。参数最后需要以NULL结束（哨兵）
+//只有当调用失败，才会有返回值，返回-1，并且设置errno
+//argv是需要的参数的一个字符串数组，char * argv[] = {"ps", "aux", NULL};
+//char * envp[] = {"/home/nowcoder", "/home/bbb", "/home/aaa"};
+
+l(list) 参数地址列表，以空指针结尾
+v(vector) 存有各参数地址的指针数组的地址
+p(path) 按 PATH 环境变量指定的目录搜索可执行文件
+e(environment) 存有环境变量字符串地址的指针数组的地址
+~~~
 
 ### 7 进程控制
 
 #### 7.1 进程退出
 
+~~~cpp
+#include <stdlib.h>
+void exit(int status);
+
+#include <unistd.h>
+void _exit(int status);
+
+status参数：是进程退出时的一个状态信息。父进程回收子进程资源的时候可以获取到。
+~~~
+
+<img src="image\20220913002.png" alt="20220913002" style="zoom: 50%;" />
+
 #### 7.2 孤儿进程
+
+父进程运行结束，但子进程还在运行（未运行结束），这样的子进程就称为孤儿进程（Orphan Process）。
+
+每当出现一个孤儿进程的时候，内核就把孤儿进程的父进程设置为 init ，而 init 进程会循环地 wait() 它的已经退出的子进程。
+
+这样，当一个孤儿进程结束了其生命周期的时候，init 进程就会处理它的一切善后工作。
+
+因此孤儿进程并不会有什么危害。
 
 #### 7.3 僵尸进程
 
+每个进程结束之后, 都会释放自己地址空间中的用户区数据，内核区的 PCB 没有办法自己释放掉，需要父进程去释放。
+
+进程终止时，父进程尚未回收，子进程残留资源（PCB）存放于内核中，变成僵尸进程。
+
+僵尸进程不能被 kill -9 杀死，这样就会导致一个问题，如果父进程不调用 wait() 或 waitpid() 的话，那么保留的那段信息就不会释放，其进程号就会一直被占用，但是系统所能使用的进程号是有限的，如果大量的产生僵尸进程，将因为没有可用的进程号而导致系统不能产生新的进程，此即为僵尸进程的危害，应当避免。
+
 #### 7.4 进程回收
 
-#### 7.5 推出信息相关宏函数
+在每个进程退出的时候，内核释放该进程所有的资源、包括打开的文件、占用的内
+存等。但是仍然为其保留一定的信息，这些信息主要主要指进程控制块PCB的信息（包括进程号、退出状态、运行时间等）。
+
+父进程可以通过调用 wait 或 waitpid 得到它的退出状态，同时彻底清除掉这个进程。
+
+wait() 和 waitpid() 函数的功能一样，区别在于，wait() 函数会阻塞，waitpid() 可以设置不阻塞，waitpid() 还可以指定等待哪个子进程结束。
+注意：一次 wait 或 waitpid 调用只能清理一个子进程，清理多个子进程应使用循环。
+
+~~~cpp
+#include <sys/types.h>
+#include <sys/wait.h>
+pid_t wait(int *wstatus);
+        功能：等待任意一个子进程结束，如果任意一个子进程结束了，此函数会回收子进程的资源。
+        参数：int *wstatus
+            进程退出时的状态信息，传入的是一个int类型的地址，传出参数。
+        返回值：
+            - 成功：返回被回收的子进程的id
+            - 失败：-1 (所有的子进程都结束，调用函数失败)
+
+退出信息相关宏函数：
+  WIFEXITED(status) 非0，进程正常退出
+  WEXITSTATUS(status) 如果上宏为真，获取进程退出的状态（exit的参数）
+  WIFSIGNALED(status) 非0，进程异常终止
+  WTERMSIG(status) 如果上宏为真，获取使进程终止的信号编号
+  WIFSTOPPED(status) 非0，进程处于暂停状态
+  WSTOPSIG(status) 如果上宏为真，获取使进程暂停的信号的编号
+  WIFCONTINUED(status) 非0，进程暂停后已经继续运行
+
+
+~~~
+
+调用 wait 函数的进程会被挂起（阻塞），直到它的一个子进程退出或者收到一个不能被忽略的信号时才被唤醒（相当于继续往下执行）。
+
+如果没有子进程了，函数立刻返回，返回-1；如果子进程都已经结束了，也会立即返回，返回-1。
+
+~~~cpp
+#include <sys/types.h>
+#include <sys/wait.h>
+pid_t waitpid(pid_t pid, int *wstatus, int options);
+        功能：回收指定进程号的子进程，可以设置是否阻塞。
+        参数：
+            - pid:
+                pid > 0 : 某个子进程的pid
+                pid = 0 : 回收当前进程组的所有子进程    
+                pid = -1 : 回收所有的子进程，相当于 wait()  （最常用）
+                pid < -1 : 某个进程组的组id的绝对值，回收指定进程组中的子进程
+            - options：设置阻塞或者非阻塞
+                0 : 阻塞
+                WNOHANG : 非阻塞
+            - 返回值：
+                > 0 : 返回子进程的id
+                = 0 : options=WNOHANG, 表示还有子进程或者
+                = -1 ：错误，或者没有子进程了
+~~~
 
 ### 8 进程通信
 
 #### 8.1 Linux进程通信方式
 
+<img src="image\20220913003.png" alt="20220913003" style="zoom: 67%;" />
+
+管道其实是一个在内核内存中维护的缓冲器，这个缓冲器的存储能力是有限的，不同的操作系统大小不一定相同。
+
+管道拥有文件的特质：读操作、写操作，匿名管道没有文件实体，有名管道有文件实体，但不存储数据。可以按照操作文件的方式对管道进行操作。
+
+一个管道是一个字节流，使用管道时不存在消息或者消息边界的概念，从管道读取数据的进程可以读取任意大小的数据块，而不管写入进程写入管道的数据块的大小是多少。
+
+通过管道传递的数据是顺序的，从管道中读取出来的字节的顺序和它们被写入管道的顺序是完全一样的。
+
+管道中数据的传递方向是单向的，一端用于写入，一端用于读取，管道是半双工的。
+
+<img src="image\20220913004.png" alt="20220913004" style="zoom: 50%;" />
+
+从管道读数据是一次性操作，数据一旦被读走，它就从管道中被抛弃，释放空间以便写更多的数据，在管道中无法使用 `lseek()` 来随机的访问数据。
+
+匿名管道只能在具有公共祖先的进程（父进程与子进程，或者两个兄弟进程，具有亲缘关系）之间使用。
+
 #### 8.2 匿名管道
+
+~~~cpp
+//创建匿名管道
+#include <unistd.h>
+int pipe(int pipefd[2]);
+
+//查看管道缓冲大小的命令
+ulimit –a
+
+//查看管道缓冲大小的函数
+#include <unistd.h>
+long fpathconf(int fd, int name);
+
+#include <unistd.h>
+int pipe(int pipefd[2]);
+        功能：创建一个匿名管道，用来进程间通信。
+        参数：int pipefd[2] 这个数组是一个传出参数。
+            pipefd[0] 对应的是管道的读端
+            pipefd[1] 对应的是管道的写端
+        返回值：
+            成功 0
+            失败 -1
+~~~
+
+管道默认是阻塞的：如果管道中没有数据，read阻塞，如果管道满了，write阻塞
+
+注意：匿名管道只能用于具有关系的进程之间的通信（父子进程，兄弟进程）
+
+
+
+使用管道时，需要注意以下几种特殊的情况（假设都是阻塞I/O操作）
+
+- 所有的指向管道写端的文件描述符都关闭了（管道写端引用计数为0），有进程从管道的读端读数据，那么管道中剩余的数据被读取以后，再次read会返回0，就像读到文件末尾一样。
+- 如果有指向管道写端的文件描述符没有关闭（管道的写端引用计数大于0），而持有管道写端的进程也没有往管道中写数据，这个时候有进程从管道中读取数据，那么管道中剩余的数据被读取后，再次read会阻塞，直到管道中有数据可以读了才读取数据并返回。
+- 如果所有指向管道读端的文件描述符都关闭了（管道的读端引用计数为0），这个时候有进程向管道中写数据，那么该进程会收到一个信号 SIGPIPE, 通常会导致进程异常终止。
+- 如果有指向管道读端的文件描述符没有关闭（管道的读端引用计数大于0），而持有管道读端的进程也没有从管道中读数据，这时有进程向管道中写数据，那么在管道被写满的时候再次write会阻塞，直到管道中有空位置才能再次写入数据并返回。
 
 #### 8.3 命名管道
 
+匿名管道，由于没有名字，只能用于亲缘关系的进程间通信。为了克服这个缺点，提出了有名管道（FIFO），也叫命名管道、FIFO文件。
+
+有名管道（FIFO）不同于匿名管道之处在于它提供了一个路径名与之关联，以 FIFO 的文件形式存在于文件系统中，并且其打开方式与打开一个普通文件是一样的，这样即使与 FIFO 的创建进程不存在亲缘关系的进程，只要可以访问该路径，就能够彼此通过 FIFO 相互通信，因此，通过 FIFO 不相关的进程也能交换数据。
+
+一旦打开了 FIFO，就能在它上面使用与操作匿名管道和其他文件的系统调用一样的I/O系统调用了（如read()、write()和close()）。
+
+与管道一样，FIFO 也有一个写入端和读取端，并且从管道中读取数据的顺序与写入的顺序是一样的。FIFO 的名称也由此而来：先入先出。
+
+有名管道（FIFO)和匿名管道（pipe）有一些特点是相同的，其区别在于：
+
+- FIFO 在文件系统中作为一个特殊文件存在，但 FIFO 中的内容却存放在内存中；
+- 当使用 FIFO 的进程退出后，FIFO 文件将继续保存在文件系统中以便以后使用；
+- FIFO 有名字，不相关的进程可以通过打开有名管道进行通信。
+
+~~~cpp
+#include <sys/types.h>
+#include <sys/stat.h>
+int mkfifo(const char *pathname, mode_t mode);
+    参数：
+        - pathname: 管道名称的路径
+        - mode: 文件的权限 和 open 的 mode 是一样的
+                是一个八进制的数
+    返回值：成功返回0，失败返回-1，并设置错误号
+~~~
+
 #### 8.4 内存映射
+
+`内存映射`（Memory-mapped I/O）是将磁盘文件的数据映射到内存，用户通过修改内存就能修改磁盘文件。
+
+<img src="image\20220913005.png" alt="20220913005" style="zoom: 80%;" />
+
+~~~cpp
+#include <sys/mman.h>
+void *mmap(void *addr, size_t length, int prot, int flags,int fd, off_t offset);
+        - 功能：将一个文件或者设备的数据映射到内存中
+        - 参数：
+            - void *addr: NULL, 由内核指定
+            - length : 要映射的数据的长度，这个值不能为0。建议使用文件的长度。
+                    获取文件的长度：stat lseek
+            - prot : 对申请的内存映射区的操作权限
+                -PROT_EXEC ：可执行的权限
+                -PROT_READ ：读权限
+                -PROT_WRITE ：写权限
+                -PROT_NONE ：没有权限
+                要操作映射内存，必须要有读的权限。
+                PROT_READ、PROT_READ|PROT_WRITE
+            - flags :
+                - MAP_SHARED : 映射区的数据会自动和磁盘文件进行同步，进程间通信，必须要设置这个选项
+                - MAP_PRIVATE ：不同步，内存映射区的数据改变了，对原来的文件不会修改，会重新创建一个新的文件。（copy on write）
+            - fd: 需要映射的那个文件的文件描述符
+                - 通过open得到，open的是一个磁盘文件
+                - 注意：文件的大小不能为0，open指定的权限不能和prot参数有冲突。
+                    prot: PROT_READ                open:只读/读写 
+                    prot: PROT_READ | PROT_WRITE   open:读写
+            - offset：偏移量，一般不用。必须指定的是4k的整数倍，0表示不偏移。
+        - 返回值：
+            成功返回创建的内存的首地址
+            失败返回MAP_FAILED，(void *) -1
+
+int munmap(void *addr, size_t length);
+        - 功能：释放内存映射
+        - 参数：
+            - addr : 要释放的内存的首地址
+            - length : 要释放的内存的大小，要和mmap函数中的length参数的值一样。
+~~~
+
+使用内存映射实现进程间通信：
+
+- 有关系的进程（父子进程）
+  - 还没有子进程的时候，通过唯一的父进程，先创建内存映射区
+  - 有了内存映射区以后，创建子进程
+  - 父子进程共享创建的内存映射区
+
+- 没有关系的进程间通信
+  - 准备一个大小不是0的磁盘文件
+  - 进程1 通过磁盘文件创建内存映射区，得到一个操作这块内存的指针
+  - 进程2 通过磁盘文件创建内存映射区，得到一个操作这块内存的指针
+  - 使用内存映射区通信
 
 #### 8.5 信号
 
